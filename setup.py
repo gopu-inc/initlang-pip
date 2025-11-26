@@ -36,7 +36,7 @@ def get_requirements():
 # Configuration du package
 setup(
     name="initlang",
-    version=get_version(),
+    version="1.0.0",
     
     # Métadonnées
     author="Mauricio-100",
