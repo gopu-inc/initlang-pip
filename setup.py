@@ -75,7 +75,7 @@ setup(
     # Scripts d'entrée
     entry_points={
         "console_scripts": [
-            "initlang=initlang:main", # Alias court
+            "initlang=deps:main", # Alias court
         ],
     },
     
