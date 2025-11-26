@@ -33,7 +33,12 @@ class TokenType(Enum):
     MINUS = "MINUS"
     STAR = "STAR"
     SLASH = "SLASH"
+    EQ = "EQ"
+    NEQ = "NEQ"
+    LT = "LT"
+    GT = "GT"
     INIT_GER = "INIT_GER"
+    INIT_LOG = "INIT_LOG"
     EOF = "EOF"
 
 class Token:
@@ -74,7 +79,6 @@ class Lexer:
             self.advance()
     
     def skip_comment(self):
-        # CORRECTION : Support des commentaires avec #
         if self.current_char == '#':
             while self.current_char and self.current_char != '\n':
                 self.advance()
@@ -93,6 +97,8 @@ class Lexer:
         
         if identifier == "init.ger":
             return Token(TokenType.INIT_GER, identifier, start_line, start_column)
+        if identifier == "init.log":
+            return Token(TokenType.INIT_LOG, identifier, start_line, start_column)
         
         keywords = {
             "let": TokenType.LET,
@@ -106,9 +112,13 @@ class Lexer:
         start_line = self.line
         start_column = self.column
         result = []
+        has_dot = False
         
-        # CORRECTION : Permettre les nombres qui commencent par des chiffres
         while self.current_char and (self.current_char.isdigit() or self.current_char == '.'):
+            if self.current_char == '.':
+                if has_dot:
+                    break
+                has_dot = True
             result.append(self.current_char)
             self.advance()
         
@@ -133,7 +143,6 @@ class Lexer:
         return Token(TokenType.STRING, ''.join(result), start_line, start_column)
     
     def next_token(self) -> Token:
-        # CORRECTION : Skip comments and whitespace
         while self.current_char and (self.current_char.isspace() or self.current_char == '#'):
             if self.current_char.isspace():
                 self.skip_whitespace()
@@ -143,15 +152,12 @@ class Lexer:
         if not self.current_char:
             return Token(TokenType.EOF, "", self.line, self.column)
         
-        # Identifiants (doit être avant les nombres)
         if self.current_char.isalpha() or self.current_char == '_':
             return self.read_identifier()
         
-        # Nombres
         if self.current_char.isdigit():
             return self.read_number()
         
-        # Chaînes de caractères
         if self.current_char in ['"', "'"]:
             return self.read_string()
         
@@ -165,6 +171,25 @@ class Lexer:
             self.advance()
             self.advance()
             return Token(TokenType.ARROW, "==>", current_line, current_column)
+        
+        # Comparaisons
+        if current_char == '=' and self.peek() == '=':
+            self.advance()
+            self.advance()
+            return Token(TokenType.EQ, "==", current_line, current_column)
+        
+        if current_char == '!' and self.peek() == '=':
+            self.advance()
+            self.advance()
+            return Token(TokenType.NEQ, "!=", current_line, current_column)
+        
+        if current_char == '<':
+            self.advance()
+            return Token(TokenType.LT, "<", current_line, current_column)
+        
+        if current_char == '>':
+            self.advance()
+            return Token(TokenType.GT, ">", current_line, current_column)
         
         # Opérateurs simples
         operators = {
@@ -280,7 +305,6 @@ class Parser:
     def parse_let_statement(self) -> VariableDeclaration:
         self.next_token()  # skip 'let'
         
-        # CORRECTION : Permettre les identifiants qui commencent par des chiffres
         if self.current_token.type != TokenType.IDENTIFIER:
             self.error("Expected identifier after 'let'")
         
@@ -301,10 +325,16 @@ class Parser:
     
     # Précedence
     LOWEST = 1
-    SUM = 2
-    PRODUCT = 3
+    EQUALS = 2
+    LESSGREATER = 3
+    SUM = 4
+    PRODUCT = 5
     
     PRECEDENCES = {
+        TokenType.EQ: EQUALS,
+        TokenType.NEQ: EQUALS,
+        TokenType.LT: LESSGREATER,
+        TokenType.GT: LESSGREATER,
         TokenType.PLUS: SUM,
         TokenType.MINUS: SUM,
         TokenType.SLASH: PRODUCT,
@@ -341,13 +371,18 @@ class Parser:
             return self.parse_string_literal()
         elif token.type == TokenType.INIT_GER:
             return self.parse_init_ger()
+        elif token.type == TokenType.INIT_LOG:
+            return self.parse_init_log()
         elif token.type == TokenType.LPAREN:
             return self.parse_grouped_expression()
         else:
             return None
     
     def parse_infix(self, left: Expression) -> Optional[Expression]:
-        if self.current_token.type in [TokenType.PLUS, TokenType.MINUS, TokenType.STAR, TokenType.SLASH]:
+        if self.current_token.type in [
+            TokenType.PLUS, TokenType.MINUS, TokenType.STAR, TokenType.SLASH,
+            TokenType.EQ, TokenType.NEQ, TokenType.LT, TokenType.GT
+        ]:
             return self.parse_binary_expression(left)
         elif self.current_token.type == TokenType.LPAREN:
             return self.parse_call_expression(left)
@@ -380,6 +415,20 @@ class Parser:
             self.error("Expected ')' after init.ger argument")
         
         return CallExpression(Identifier("init_ger"), [arg])
+    
+    def parse_init_log(self) -> Expression:
+        self.next_token()  # skip 'init.log'
+        
+        if self.current_token.type != TokenType.LPAREN:
+            self.error("Expected '(' after init.log")
+        
+        self.next_token()  # skip '('
+        arg = self.parse_expression(self.LOWEST)
+        
+        if not self.expect_peek(TokenType.RPAREN):
+            self.error("Expected ')' after init.log argument")
+        
+        return CallExpression(Identifier("init_log"), [arg])
     
     def parse_grouped_expression(self) -> Optional[Expression]:
         self.next_token()  # skip '('
@@ -444,11 +493,18 @@ class Environment:
     
     def set(self, name: str, value: Any):
         self.store[name] = value
+    
+    def list_variables(self) -> Dict[str, Any]:
+        return self.store.copy()
 
 class Interpreter:
     def __init__(self):
         self.environment = Environment()
+        self._init_builtins()
+    
+    def _init_builtins(self):
         self.environment.set("init_ger", lambda x: print(x))
+        self.environment.set("init_log", lambda x: print(f"[LOG] {x}"))
     
     def interpret(self, program: Program):
         for statement in program.statements:
@@ -481,6 +537,14 @@ class Interpreter:
                 return left * right
             elif expr.operator == TokenType.SLASH:
                 return left / right if right != 0 else float('inf')
+            elif expr.operator == TokenType.EQ:
+                return left == right
+            elif expr.operator == TokenType.NEQ:
+                return left != right
+            elif expr.operator == TokenType.LT:
+                return left < right
+            elif expr.operator == TokenType.GT:
+                return left > right
         elif isinstance(expr, CallExpression):
             if isinstance(expr.function, Identifier):
                 func = self.environment.get(expr.function.name)
@@ -489,7 +553,7 @@ class Interpreter:
                     return func(*args)
         return None
 
-# ==================== CLI ====================
+# ==================== CLI AMÉLIORÉ ====================
 
 def show_help():
     print(f"""
@@ -503,6 +567,12 @@ Options:
   -v, --version       Show version information
   -c, --command CODE  Execute code directly
 
+REPL Commands:
+  help                Show this help
+  vars                Show all variables
+  clear               Clear screen
+  exit, quit          Exit REPL
+
 Examples:
   initlang                    # Start REPL
   initlang script.init        # Execute file
@@ -511,27 +581,43 @@ Examples:
 Syntax:
   let x ==> 5
   init.ger("Hello World!")
-  # This is a comment
+  init.log("Debug info")
+  x + 10
+  x == 5
     """)
 
 def show_version():
     print(f"INITLANG version {__version__}")
 
-def execute_code(code: str):
-    try:
-        lexer = Lexer(code)
-        parser = Parser(lexer)
-        program = parser.parse_program()
-        interpreter = Interpreter()
-        interpreter.interpret(program)
-    except Exception as e:
-        print(f"Error: {e}")
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
 
-def main():
-    if len(sys.argv) == 1:
-        # REPL Mode
+class REPL:
+    def __init__(self):
+        self.interpreter = Interpreter()
+    
+    def show_variables(self):
+        variables = self.interpreter.environment.list_variables()
+        if variables:
+            print("=== VARIABLES ===")
+            for name, value in variables.items():
+                if not callable(value):  # Ne pas afficher les fonctions built-in
+                    print(f"  {name} = {value}")
+        else:
+            print("No variables defined")
+    
+    def execute_code(self, code: str):
+        try:
+            lexer = Lexer(code)
+            parser = Parser(lexer)
+            program = parser.parse_program()
+            self.interpreter.interpret(program)
+        except Exception as e:
+            print(f"Error: {e}")
+    
+    def start(self):
         print(f"=== INITLANG {__version__} ===")
-        print("Type 'exit' to quit, 'help' for help")
+        print("Type 'help' for commands, 'exit' to quit")
         
         while True:
             try:
@@ -542,17 +628,44 @@ def main():
                 elif line.lower() == 'help':
                     show_help()
                     continue
+                elif line.lower() == 'vars':
+                    self.show_variables()
+                    continue
+                elif line.lower() == 'clear':
+                    clear_screen()
+                    continue
                 elif not line:
                     continue
                 
-                execute_code(line)
+                self.execute_code(line)
                 
             except EOFError:
+                print("\nGoodbye!")
                 break
             except KeyboardInterrupt:
                 print("\nUse 'exit' to quit")
             except Exception as e:
                 print(f"Error: {e}")
+
+def execute_code(code: str, interpreter: Interpreter = None):
+    if interpreter is None:
+        interpreter = Interpreter()
+    
+    try:
+        lexer = Lexer(code)
+        parser = Parser(lexer)
+        program = parser.parse_program()
+        interpreter.interpret(program)
+        return interpreter
+    except Exception as e:
+        print(f"Error: {e}")
+        return interpreter
+
+def main():
+    if len(sys.argv) == 1:
+        # REPL Mode avec état persistant
+        repl = REPL()
+        repl.start()
     
     elif sys.argv[1] in ['-h', '--help']:
         show_help()
@@ -561,7 +674,8 @@ def main():
         show_version()
     
     elif sys.argv[1] in ['-c', '--command'] and len(sys.argv) > 2:
-        execute_code(sys.argv[2])
+        interpreter = Interpreter()
+        execute_code(sys.argv[2], interpreter)
     
     elif len(sys.argv) == 2:
         # File execution
@@ -573,7 +687,8 @@ def main():
         with open(filename, 'r') as f:
             code = f.read()
         
-        execute_code(code)
+        interpreter = Interpreter()
+        execute_code(code, interpreter)
     
     else:
         show_help()
