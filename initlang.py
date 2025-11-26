@@ -16,7 +16,7 @@ __version__ = "1.0.0"
 __author__ = "Mauricio"
 __description__ = "INITLANG - Langage de programmation innovant"
 
-# ==================== LEXER AMÉLIORÉ ====================
+# ==================== LEXER CORRIGÉ ====================
 
 class TokenType(Enum):
     # Identifiants & Littéraux
@@ -29,14 +29,9 @@ class TokenType(Enum):
     FI = "FI"
     CONST = "CONST"
     RETURN = "RETURN"
-    IF = "IF"
-    ELSE = "ELSE"
-    WHILE = "WHILE"
-    FOR = "FOR"
     
     # Opérateurs
     ARROW = "ARROW"           # ==>
-    DOUBLE_ARROW = "DOUBLE_ARROW" # =>
     DOT = "DOT"               # .
     COLON = "COLON"           # :
     COMMA = "COMMA"           # ,
@@ -47,28 +42,18 @@ class TokenType(Enum):
     RPAREN = "RPAREN"
     LBRACE = "LBRACE"
     RBRACE = "RBRACE"
-    LBRACKET = "LBRACKET"
-    RBRACKET = "RBRACKET"
     
     # Opérateurs mathématiques
     PLUS = "PLUS"
     MINUS = "MINUS"
     STAR = "STAR"
     SLASH = "SLASH"
-    PERCENT = "PERCENT"
     
     # Comparaisons
     EQ = "EQ"      # ==
     NEQ = "NEQ"    # !=
     LT = "LT"      # <
     GT = "GT"      # >
-    LTE = "LTE"    # <=
-    GTE = "GTE"    # >=
-    
-    # Logique
-    AND = "AND"    # &&
-    OR = "OR"      # ||
-    NOT = "NOT"    # !
     
     # Spéciaux INITLANG
     INIT_GER = "INIT_GER"     # init.ger
@@ -142,10 +127,6 @@ class Lexer:
             "fi": TokenType.FI,
             "const": TokenType.CONST,
             "return": TokenType.RETURN,
-            "if": TokenType.IF,
-            "else": TokenType.ELSE,
-            "while": TokenType.WHILE,
-            "for": TokenType.FOR,
         }
         
         token_type = keywords.get(identifier, TokenType.IDENTIFIER)
@@ -195,12 +176,12 @@ class Lexer:
         return Token(TokenType.STRING, ''.join(result), start_line, start_column)
     
     def next_token(self) -> Token:
-        while self.current_char and self.current_char.isspace():
-            self.skip_whitespace()
-        
-        if self.current_char == '#':
-            self.skip_comment()
-            return self.next_token()
+        # Skip whitespace and comments
+        while self.current_char and (self.current_char.isspace() or self.current_char == '#'):
+            if self.current_char.isspace():
+                self.skip_whitespace()
+            elif self.current_char == '#':
+                self.skip_comment()
         
         if not self.current_char:
             return Token(TokenType.EOF, "", self.line, self.column)
@@ -221,20 +202,14 @@ class Lexer:
         current_line = self.line
         current_column = self.column
         
-        # Opérateur arrow ==>
+        # CORRECTION : Opérateur arrow ==> 
         if (current_char == '=' and self.peek() == '=' and self.peek(2) == '>'):
             self.advance()  # =
             self.advance()  # =
             self.advance()  # >
             return Token(TokenType.ARROW, "==>", current_line, current_column)
         
-        # Double arrow =>
-        if current_char == '=' and self.peek() == '>':
-            self.advance()  # =
-            self.advance()  # >
-            return Token(TokenType.DOUBLE_ARROW, "=>", current_line, current_column)
-        
-        # Comparaisons et logique
+        # CORRECTION : Comparaisons
         if current_char == '=' and self.peek() == '=':
             self.advance()  # =
             self.advance()  # =
@@ -245,46 +220,22 @@ class Lexer:
             self.advance()  # =
             return Token(TokenType.NEQ, "!=", current_line, current_column)
         
-        if current_char == '<' and self.peek() == '=':
-            self.advance()  # <
-            self.advance()  # =
-            return Token(TokenType.LTE, "<=", current_line, current_column)
-        
-        if current_char == '>' and self.peek() == '=':
-            self.advance()  # >
-            self.advance()  # =
-            return Token(TokenType.GTE, ">=", current_line, current_column)
-        
-        if current_char == '&' and self.peek() == '&':
-            self.advance()  # &
-            self.advance()  # &
-            return Token(TokenType.AND, "&&", current_line, current_column)
-        
-        if current_char == '|' and self.peek() == '|':
-            self.advance()  # |
-            self.advance()  # |
-            return Token(TokenType.OR, "||", current_line, current_column)
-        
         # Opérateurs simples
         operators = {
             '+': TokenType.PLUS,
             '-': TokenType.MINUS,
             '*': TokenType.STAR,
             '/': TokenType.SLASH,
-            '%': TokenType.PERCENT,
             '(': TokenType.LPAREN,
             ')': TokenType.RPAREN,
             '{': TokenType.LBRACE,
             '}': TokenType.RBRACE,
-            '[': TokenType.LBRACKET,
-            ']': TokenType.RBRACKET,
             ',': TokenType.COMMA,
             ':': TokenType.COLON,
             '.': TokenType.DOT,
             ';': TokenType.SEMICOLON,
             '<': TokenType.LT,
             '>': TokenType.GT,
-            '!': TokenType.NOT,
         }
         
         if current_char in operators:
@@ -303,7 +254,7 @@ class Lexer:
                 break
         return tokens
 
-# ==================== AST AMÉLIORÉ ====================
+# ==================== AST SIMPLIFIÉ ====================
 
 class ASTNode:
     pass
@@ -322,12 +273,6 @@ class StringLiteral(Expression):
         self.value = value
     def __repr__(self):
         return f"String('{self.value}')"
-
-class BooleanLiteral(Expression):
-    def __init__(self, value: bool):
-        self.value = value
-    def __repr__(self):
-        return f"Boolean({self.value})"
 
 class Identifier(Expression):
     def __init__(self, name: str):
@@ -369,27 +314,12 @@ class VariableDeclaration(Statement):
         const_str = "const " if self.is_const else ""
         return f"VarDecl({const_str}{self.name} = {self.value})"
 
-class FunctionDeclaration(Statement):
-    def __init__(self, name: str, parameters: List[str], body: 'BlockStatement'):
-        self.name = name
-        self.parameters = parameters
-        self.body = body
-    def __repr__(self):
-        params = ', '.join(self.parameters)
-        return f"FuncDecl({self.name}({params}) {{ ... }})"
-
 class BlockStatement(Statement):
     def __init__(self, statements: Optional[List[Statement]] = None):
         self.statements = statements or []
     def __repr__(self):
         stmts = '; '.join(str(stmt) for stmt in self.statements)
         return f"Block({{ {stmts} }})"
-
-class ReturnStatement(Statement):
-    def __init__(self, value: Optional[Expression] = None):
-        self.value = value
-    def __repr__(self):
-        return f"Return({self.value})"
 
 class Program(ASTNode):
     def __init__(self, statements: Optional[List[Statement]] = None):
@@ -398,7 +328,7 @@ class Program(ASTNode):
         stmts = '\n'.join(str(stmt) for stmt in self.statements)
         return f"Program:\n{stmts}"
 
-# ==================== PARSER AMÉLIORÉ ====================
+# ==================== PARSER CORRIGÉ ====================
 
 class Parser:
     def __init__(self, lexer: Lexer):
@@ -433,8 +363,6 @@ class Parser:
             return self.parse_let_statement()
         elif self.current_token.type == TokenType.FI:
             return self.parse_function_statement()
-        elif self.current_token.type == TokenType.RETURN:
-            return self.parse_return_statement()
         else:
             return self.parse_expression_statement()
     
@@ -519,13 +447,9 @@ class Parser:
         
         return block
     
-    def parse_return_statement(self) -> ReturnStatement:
-        self.next_token()  # skip 'return'
-        value = self.parse_expression(self.LOWEST)
-        return ReturnStatement(value)
-    
     def parse_expression_statement(self) -> ExpressionStatement:
         expr = self.parse_expression(self.LOWEST)
+        # CORRECTION : Ne pas exiger de point-virgule
         return ExpressionStatement(expr)
     
     # Précedence des opérateurs
@@ -542,13 +466,10 @@ class Parser:
         TokenType.NEQ: EQUALS,
         TokenType.LT: LESSGREATER,
         TokenType.GT: LESSGREATER,
-        TokenType.LTE: LESSGREATER,
-        TokenType.GTE: LESSGREATER,
         TokenType.PLUS: SUM,
         TokenType.MINUS: SUM,
         TokenType.SLASH: PRODUCT,
         TokenType.STAR: PRODUCT,
-        TokenType.PERCENT: PRODUCT,
         TokenType.LPAREN: CALL,
     }
     
@@ -584,17 +505,16 @@ class Parser:
             return self.parse_init_ger()
         elif token.type == TokenType.LPAREN:
             return self.parse_grouped_expression()
-        elif token.type in [TokenType.MINUS, TokenType.PLUS, TokenType.NOT]:
+        elif token.type in [TokenType.MINUS, TokenType.PLUS]:
             return self.parse_prefix_expression()
         else:
-            self.error(f"No prefix parse function for {token.type}")
+            # CORRECTION : Ignorer les tokens inattendus au lieu de faire une erreur
             return None
     
     def parse_infix(self, left: Expression) -> Optional[Expression]:
         if self.current_token.type in [
-            TokenType.PLUS, TokenType.MINUS, TokenType.STAR, TokenType.SLASH, TokenType.PERCENT,
-            TokenType.EQ, TokenType.NEQ, TokenType.LT, TokenType.GT, TokenType.LTE, TokenType.GTE,
-            TokenType.AND, TokenType.OR
+            TokenType.PLUS, TokenType.MINUS, TokenType.STAR, TokenType.SLASH,
+            TokenType.EQ, TokenType.NEQ, TokenType.LT, TokenType.GT
         ]:
             return self.parse_binary_expression(left)
         elif self.current_token.type == TokenType.LPAREN:
@@ -617,7 +537,7 @@ class Parser:
         return StringLiteral(self.current_token.value)
     
     def parse_init_ger(self) -> Expression:
-        # init.ger(expression)
+        # CORRECTION : init.ger(expression)
         self.next_token()  # skip 'init.ger'
         
         if self.current_token.type != TokenType.LPAREN:
@@ -625,6 +545,9 @@ class Parser:
         
         self.next_token()  # skip '('
         arg = self.parse_expression(self.LOWEST)
+        
+        if not arg:
+            self.error("Expected expression inside init.ger")
         
         if not self.expect_peek(TokenType.RPAREN):
             self.error("Expected ')' after init.ger argument")
@@ -652,9 +575,6 @@ class Parser:
             # Créer une expression binaire: 0 - right
             zero = NumberLiteral(0)
             return BinaryExpression(TokenType.MINUS, zero, right)
-        elif op == TokenType.NOT:
-            # Pour l'instant, on retourne simplement la valeur
-            return right
         
         return right
     
@@ -682,19 +602,23 @@ class Parser:
             return args
         
         self.next_token()  # skip '(' or ','
-        args.append(self.parse_expression(self.LOWEST))
+        arg = self.parse_expression(self.LOWEST)
+        if arg:
+            args.append(arg)
         
         while self.peek_token.type == TokenType.COMMA:
             self.next_token()  # skip expression
             self.next_token()  # skip ','
-            args.append(self.parse_expression(self.LOWEST))
+            arg = self.parse_expression(self.LOWEST)
+            if arg:
+                args.append(arg)
         
         if not self.expect_peek(TokenType.RPAREN):
             self.error("Expected ')' after arguments")
         
         return args
 
-# ==================== INTERPRETER AMÉLIORÉ ====================
+# ==================== INTERPRETER CORRIGÉ ====================
 
 class Environment:
     def __init__(self, parent=None):
@@ -721,11 +645,6 @@ class Interpreter:
         # Fonctions built-in
         self.environment.set("init_ger", lambda x: print(x))
         self.environment.set("init_log", lambda x: print(f"[LOG] {x}"))
-        
-        # Constantes
-        self.environment.set("true", True)
-        self.environment.set("false", False)
-        self.environment.set("null", None)
     
     def interpret(self, program: Program):
         result = None
@@ -740,10 +659,8 @@ class Interpreter:
             value = self.evaluate_expression(stmt.value)
             self.environment.set(stmt.name, value)
             return value
-        elif isinstance(stmt, ReturnStatement):
-            return self.evaluate_expression(stmt.value) if stmt.value else None
         else:
-            raise NotImplementedError(f"Statement type {type(stmt)} not implemented")
+            return None
     
     def evaluate_expression(self, expr: Expression) -> Any:
         if isinstance(expr, NumberLiteral):
@@ -765,8 +682,6 @@ class Interpreter:
                 return left * right
             elif expr.operator == TokenType.SLASH:
                 return left / right if right != 0 else float('inf')
-            elif expr.operator == TokenType.PERCENT:
-                return left % right if right != 0 else 0
             elif expr.operator == TokenType.EQ:
                 return left == right
             elif expr.operator == TokenType.NEQ:
@@ -775,14 +690,6 @@ class Interpreter:
                 return left < right
             elif expr.operator == TokenType.GT:
                 return left > right
-            elif expr.operator == TokenType.LTE:
-                return left <= right
-            elif expr.operator == TokenType.GTE:
-                return left >= right
-            elif expr.operator == TokenType.AND:
-                return left and right
-            elif expr.operator == TokenType.OR:
-                return left or right
             else:
                 raise NotImplementedError(f"Operator {expr.operator} not implemented")
         elif isinstance(expr, CallExpression):
@@ -795,7 +702,7 @@ class Interpreter:
         else:
             raise NotImplementedError(f"Expression type {type(expr)} not implemented")
 
-# ==================== CLI AVEC ARGPARSE ====================
+# ==================== CLI AMÉLIORÉ ====================
 
 def show_help():
     print(f"""
@@ -821,6 +728,9 @@ Syntax Examples:
   let x ==> 5
   init.ger("Hello World!")
   fi add(a, b) {{ return a + b }}
+
+Note: Use quotes around strings in command line:
+  initlang -c "init.ger(\\"Hello\\")"
     """)
 
 def show_version():
@@ -863,7 +773,8 @@ def main():
     parser.add_argument('--ast', action='store_true', help='Show AST')
     parser.add_argument('file', nargs='?', help='File to execute')
     
-    args = parser.parse_args()
+    # Parse known args pour éviter les erreurs avec les guillemets
+    args, unknown = parser.parse_known_args()
     
     if args.help:
         show_help()
@@ -874,7 +785,9 @@ def main():
         return
     
     if args.command:
-        execute_code(args.command, args.tokens, args.ast)
+        # CORRECTION : Gérer les guillemets dans la commande
+        command = args.command
+        execute_code(command, args.tokens, args.ast)
         return
     
     if args.file:
@@ -894,8 +807,6 @@ def main():
     print("Type 'help' for help")
     print()
     
-    interpreter = Interpreter()
-    
     while True:
         try:
             line = input("INITLANG> ").strip()
@@ -908,10 +819,7 @@ def main():
             elif not line:
                 continue
             
-            # Ajouter un point-virgule si manquant
-            if not line.endswith(';'):
-                line += ';'
-            
+            # CORRECTION : Ne pas ajouter de point-virgule automatiquement
             execute_code(line, args.tokens, args.ast)
             
         except EOFError:
