@@ -6,7 +6,6 @@ Syntaxe: let x ==> 5, fi add(a, b) { }, init.ger("Hello")
 
 import sys
 import os
-import readline
 from enum import Enum
 from typing import List, Optional, Dict, Any
 
@@ -644,6 +643,9 @@ class REPL:
                 if result is not None:
                     print(result)
                     
+            except EOFError:
+                print("\nGoodbye!")
+                break
             except Exception as e:
                 print(f"Error: {e}")
     
