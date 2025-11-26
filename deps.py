@@ -12,7 +12,7 @@ from typing import List, Optional, Dict, Any
 
 # ==================== VERSION ====================
 
-__version__ = "1.0.0"
+__version__ = "copyright (c) gopu-inc componement as | 1.0.0"
 __author__ = "Mauricio"
 
 # ==================== LEXER ====================
@@ -73,6 +73,12 @@ class Lexer:
                 self.column = 1
             self.advance()
     
+    def skip_comment(self):
+        # CORRECTION : Support des commentaires avec #
+        if self.current_char == '#':
+            while self.current_char and self.current_char != '\n':
+                self.advance()
+    
     def read_identifier(self) -> Token:
         start_line = self.line
         start_column = self.column
@@ -101,7 +107,8 @@ class Lexer:
         start_column = self.column
         result = []
         
-        while self.current_char and self.current_char.isdigit():
+        # CORRECTION : Permettre les nombres qui commencent par des chiffres
+        while self.current_char and (self.current_char.isdigit() or self.current_char == '.'):
             result.append(self.current_char)
             self.advance()
         
@@ -126,17 +133,25 @@ class Lexer:
         return Token(TokenType.STRING, ''.join(result), start_line, start_column)
     
     def next_token(self) -> Token:
-        self.skip_whitespace()
+        # CORRECTION : Skip comments and whitespace
+        while self.current_char and (self.current_char.isspace() or self.current_char == '#'):
+            if self.current_char.isspace():
+                self.skip_whitespace()
+            elif self.current_char == '#':
+                self.skip_comment()
         
         if not self.current_char:
             return Token(TokenType.EOF, "", self.line, self.column)
         
+        # Identifiants (doit être avant les nombres)
         if self.current_char.isalpha() or self.current_char == '_':
             return self.read_identifier()
         
+        # Nombres
         if self.current_char.isdigit():
             return self.read_number()
         
+        # Chaînes de caractères
         if self.current_char in ['"', "'"]:
             return self.read_string()
         
@@ -265,6 +280,7 @@ class Parser:
     def parse_let_statement(self) -> VariableDeclaration:
         self.next_token()  # skip 'let'
         
+        # CORRECTION : Permettre les identifiants qui commencent par des chiffres
         if self.current_token.type != TokenType.IDENTIFIER:
             self.error("Expected identifier after 'let'")
         
@@ -495,6 +511,7 @@ Examples:
 Syntax:
   let x ==> 5
   init.ger("Hello World!")
+  # This is a comment
     """)
 
 def show_version():
@@ -514,7 +531,7 @@ def main():
     if len(sys.argv) == 1:
         # REPL Mode
         print(f"=== INITLANG {__version__} ===")
-        print("Type 'exit' to quit")
+        print("Type 'exit' to quit, 'help' for help")
         
         while True:
             try:
