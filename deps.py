@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 INITLANG - Langage de programmation innovant
-Syntaxe: let x ==> 5, fi add(a, b) { }, init.ger("Hello")
+Syntaxe: let x ==> 5, init.ger("Hello")
 """
 
 import sys
@@ -10,55 +10,30 @@ import argparse
 from enum import Enum
 from typing import List, Optional, Dict, Any
 
-# ==================== VERSION & MÉTADONNÉES ====================
+# ==================== VERSION ====================
 
 __version__ = "1.0.0"
 __author__ = "Mauricio"
-__description__ = "INITLANG - Langage de programmation innovant"
 
-# ==================== LEXER CORRIGÉ ====================
+# ==================== LEXER ====================
 
 class TokenType(Enum):
-    # Identifiants & Littéraux
     IDENTIFIER = "IDENTIFIER"
     NUMBER = "NUMBER"
     STRING = "STRING"
-    
-    # Mots-clés
     LET = "LET"
     FI = "FI"
-    CONST = "CONST"
-    RETURN = "RETURN"
-    
-    # Opérateurs
-    ARROW = "ARROW"           # ==>
-    DOT = "DOT"               # .
-    COLON = "COLON"           # :
-    COMMA = "COMMA"           # ,
-    SEMICOLON = "SEMICOLON"   # ;
-    
-    # Parenthèses
+    ARROW = "ARROW"
     LPAREN = "LPAREN"
     RPAREN = "RPAREN"
     LBRACE = "LBRACE"
     RBRACE = "RBRACE"
-    
-    # Opérateurs mathématiques
+    COMMA = "COMMA"
     PLUS = "PLUS"
     MINUS = "MINUS"
     STAR = "STAR"
     SLASH = "SLASH"
-    
-    # Comparaisons
-    EQ = "EQ"      # ==
-    NEQ = "NEQ"    # !=
-    LT = "LT"      # <
-    GT = "GT"      # >
-    
-    # Spéciaux INITLANG
-    INIT_GER = "INIT_GER"     # init.ger
-    INIT_LOG = "INIT_LOG"     # init.log
-    
+    INIT_GER = "INIT_GER"
     EOF = "EOF"
 
 class Token:
@@ -98,11 +73,6 @@ class Lexer:
                 self.column = 1
             self.advance()
     
-    def skip_comment(self):
-        if self.current_char == '#':
-            while self.current_char and self.current_char != '\n':
-                self.advance()
-    
     def read_identifier(self) -> Token:
         start_line = self.line
         start_column = self.column
@@ -115,18 +85,12 @@ class Lexer:
         
         identifier = ''.join(result)
         
-        # Mots-clés spéciaux INITLANG
         if identifier == "init.ger":
             return Token(TokenType.INIT_GER, identifier, start_line, start_column)
-        if identifier == "init.log":
-            return Token(TokenType.INIT_LOG, identifier, start_line, start_column)
         
-        # Mots-clés normaux
         keywords = {
             "let": TokenType.LET,
             "fi": TokenType.FI,
-            "const": TokenType.CONST,
-            "return": TokenType.RETURN,
         }
         
         token_type = keywords.get(identifier, TokenType.IDENTIFIER)
@@ -136,13 +100,8 @@ class Lexer:
         start_line = self.line
         start_column = self.column
         result = []
-        has_dot = False
         
-        while self.current_char and (self.current_char.isdigit() or self.current_char == '.'):
-            if self.current_char == '.':
-                if has_dot:
-                    break
-                has_dot = True
+        while self.current_char and self.current_char.isdigit():
             result.append(self.current_char)
             self.advance()
         
@@ -154,47 +113,30 @@ class Lexer:
         quote = self.current_char
         result = []
         
-        self.advance()  # Skip opening quote
+        self.advance()
         
         while self.current_char and self.current_char != quote:
-            if self.current_char == '\\':
-                self.advance()  # Skip backslash
-                # Gestion des caractères d'échappement
-                escape_chars = {
-                    'n': '\n', 't': '\t', 'r': '\r', 
-                    '"': '"', "'": "'", '\\': '\\'
-                }
-                result.append(escape_chars.get(self.current_char, self.current_char))
-            else:
-                result.append(self.current_char)
+            result.append(self.current_char)
             self.advance()
         
         if self.current_char != quote:
             raise SyntaxError(f"Unterminated string at line {self.line}")
         
-        self.advance()  # Skip closing quote
+        self.advance()
         return Token(TokenType.STRING, ''.join(result), start_line, start_column)
     
     def next_token(self) -> Token:
-        # Skip whitespace and comments
-        while self.current_char and (self.current_char.isspace() or self.current_char == '#'):
-            if self.current_char.isspace():
-                self.skip_whitespace()
-            elif self.current_char == '#':
-                self.skip_comment()
+        self.skip_whitespace()
         
         if not self.current_char:
             return Token(TokenType.EOF, "", self.line, self.column)
         
-        # Identifiants
         if self.current_char.isalpha() or self.current_char == '_':
             return self.read_identifier()
         
-        # Nombres
         if self.current_char.isdigit():
             return self.read_number()
         
-        # Chaînes de caractères
         if self.current_char in ['"', "'"]:
             return self.read_string()
         
@@ -202,23 +144,12 @@ class Lexer:
         current_line = self.line
         current_column = self.column
         
-        # CORRECTION : Opérateur arrow ==> 
+        # Opérateur arrow ==>
         if (current_char == '=' and self.peek() == '=' and self.peek(2) == '>'):
-            self.advance()  # =
-            self.advance()  # =
-            self.advance()  # >
+            self.advance()
+            self.advance()
+            self.advance()
             return Token(TokenType.ARROW, "==>", current_line, current_column)
-        
-        # CORRECTION : Comparaisons
-        if current_char == '=' and self.peek() == '=':
-            self.advance()  # =
-            self.advance()  # =
-            return Token(TokenType.EQ, "==", current_line, current_column)
-        
-        if current_char == '!' and self.peek() == '=':
-            self.advance()  # !
-            self.advance()  # =
-            return Token(TokenType.NEQ, "!=", current_line, current_column)
         
         # Opérateurs simples
         operators = {
@@ -231,18 +162,12 @@ class Lexer:
             '{': TokenType.LBRACE,
             '}': TokenType.RBRACE,
             ',': TokenType.COMMA,
-            ':': TokenType.COLON,
-            '.': TokenType.DOT,
-            ';': TokenType.SEMICOLON,
-            '<': TokenType.LT,
-            '>': TokenType.GT,
         }
         
         if current_char in operators:
             self.advance()
             return Token(operators[current_char], current_char, current_line, current_column)
         
-        # Caractère inconnu
         raise SyntaxError(f"Unexpected character '{current_char}' at line {current_line}:{current_column}")
     
     def tokenize(self) -> List[Token]:
@@ -254,7 +179,7 @@ class Lexer:
                 break
         return tokens
 
-# ==================== AST SIMPLIFIÉ ====================
+# ==================== AST ====================
 
 class ASTNode:
     pass
@@ -265,36 +190,25 @@ class Expression(ASTNode):
 class NumberLiteral(Expression):
     def __init__(self, value: float):
         self.value = value
-    def __repr__(self):
-        return f"Number({self.value})"
 
 class StringLiteral(Expression):
     def __init__(self, value: str):
         self.value = value
-    def __repr__(self):
-        return f"String('{self.value}')"
 
 class Identifier(Expression):
     def __init__(self, name: str):
         self.name = name
-    def __repr__(self):
-        return f"Identifier({self.name})"
 
 class BinaryExpression(Expression):
     def __init__(self, operator: TokenType, left: Expression, right: Expression):
         self.operator = operator
         self.left = left
         self.right = right
-    def __repr__(self):
-        return f"Binary({self.left} {self.operator.value} {self.right})"
 
 class CallExpression(Expression):
     def __init__(self, function: Expression, arguments: List[Expression]):
         self.function = function
         self.arguments = arguments
-    def __repr__(self):
-        args = ', '.join(str(arg) for arg in self.arguments)
-        return f"Call({self.function}({args}))"
 
 class Statement(ASTNode):
     pass
@@ -302,33 +216,17 @@ class Statement(ASTNode):
 class ExpressionStatement(Statement):
     def __init__(self, expression: Expression):
         self.expression = expression
-    def __repr__(self):
-        return f"ExpressionStmt({self.expression})"
 
 class VariableDeclaration(Statement):
-    def __init__(self, name: str, value: Expression, is_const: bool = False):
+    def __init__(self, name: str, value: Expression):
         self.name = name
         self.value = value
-        self.is_const = is_const
-    def __repr__(self):
-        const_str = "const " if self.is_const else ""
-        return f"VarDecl({const_str}{self.name} = {self.value})"
-
-class BlockStatement(Statement):
-    def __init__(self, statements: Optional[List[Statement]] = None):
-        self.statements = statements or []
-    def __repr__(self):
-        stmts = '; '.join(str(stmt) for stmt in self.statements)
-        return f"Block({{ {stmts} }})"
 
 class Program(ASTNode):
     def __init__(self, statements: Optional[List[Statement]] = None):
         self.statements = statements or []
-    def __repr__(self):
-        stmts = '\n'.join(str(stmt) for stmt in self.statements)
-        return f"Program:\n{stmts}"
 
-# ==================== PARSER CORRIGÉ ====================
+# ==================== PARSER ====================
 
 class Parser:
     def __init__(self, lexer: Lexer):
@@ -361,8 +259,6 @@ class Parser:
     def parse_statement(self) -> Optional[Statement]:
         if self.current_token.type == TokenType.LET:
             return self.parse_let_statement()
-        elif self.current_token.type == TokenType.FI:
-            return self.parse_function_statement()
         else:
             return self.parse_expression_statement()
     
@@ -383,94 +279,20 @@ class Parser:
         
         return VariableDeclaration(name, value)
     
-    def parse_function_statement(self) -> FunctionDeclaration:
-        self.next_token()  # skip 'fi'
-        
-        if self.current_token.type != TokenType.IDENTIFIER:
-            self.error("Expected function name after 'fi'")
-        
-        name = self.current_token.value
-        self.next_token()  # skip function name
-        
-        if not self.expect_peek(TokenType.LPAREN):
-            self.error("Expected '(' after function name")
-        
-        params = self.parse_function_parameters()
-        
-        if not self.expect_peek(TokenType.LBRACE):
-            self.error("Expected '{' after function parameters")
-        
-        body = self.parse_block_statement()
-        
-        return FunctionDeclaration(name, params, body)
-    
-    def parse_function_parameters(self) -> List[str]:
-        params = []
-        
-        if self.peek_token.type == TokenType.RPAREN:
-            self.next_token()
-            return params
-        
-        self.next_token()  # skip '(' or ','
-        
-        if self.current_token.type == TokenType.IDENTIFIER:
-            params.append(self.current_token.value)
-        else:
-            self.error("Expected parameter name")
-            return params
-        
-        while self.peek_token.type == TokenType.COMMA:
-            self.next_token()  # skip identifier
-            self.next_token()  # skip ','
-            
-            if self.current_token.type == TokenType.IDENTIFIER:
-                params.append(self.current_token.value)
-            else:
-                self.error("Expected parameter name after ','")
-                break
-        
-        if not self.expect_peek(TokenType.RPAREN):
-            self.error("Expected ')' after parameters")
-        
-        return params
-    
-    def parse_block_statement(self) -> BlockStatement:
-        block = BlockStatement()
-        self.next_token()  # skip '{'
-        
-        while (self.current_token.type != TokenType.RBRACE and 
-               self.current_token.type != TokenType.EOF):
-            stmt = self.parse_statement()
-            if stmt:
-                block.statements.append(stmt)
-            self.next_token()
-        
-        return block
-    
     def parse_expression_statement(self) -> ExpressionStatement:
         expr = self.parse_expression(self.LOWEST)
-        # CORRECTION : Ne pas exiger de point-virgule
         return ExpressionStatement(expr)
     
-    # Précedence des opérateurs
+    # Précedence
     LOWEST = 1
-    EQUALS = 2
-    LESSGREATER = 3
-    SUM = 4
-    PRODUCT = 5
-    PREFIX = 6
-    CALL = 7
+    SUM = 2
+    PRODUCT = 3
     
     PRECEDENCES = {
-        TokenType.EQ: EQUALS,
-        TokenType.NEQ: EQUALS,
-        TokenType.LT: LESSGREATER,
-        TokenType.GT: LESSGREATER,
         TokenType.PLUS: SUM,
         TokenType.MINUS: SUM,
         TokenType.SLASH: PRODUCT,
         TokenType.STAR: PRODUCT,
-        TokenType.LPAREN: CALL,
     }
     
     def current_precedence(self) -> int:
@@ -505,17 +327,11 @@ class Parser:
             return self.parse_init_ger()
         elif token.type == TokenType.LPAREN:
             return self.parse_grouped_expression()
-        elif token.type in [TokenType.MINUS, TokenType.PLUS]:
-            return self.parse_prefix_expression()
         else:
-            # CORRECTION : Ignorer les tokens inattendus au lieu de faire une erreur
             return None
     
     def parse_infix(self, left: Expression) -> Optional[Expression]:
-        if self.current_token.type in [
-            TokenType.PLUS, TokenType.MINUS, TokenType.STAR, TokenType.SLASH,
-            TokenType.EQ, TokenType.NEQ, TokenType.LT, TokenType.GT
-        ]:
+        if self.current_token.type in [TokenType.PLUS, TokenType.MINUS, TokenType.STAR, TokenType.SLASH]:
             return self.parse_binary_expression(left)
         elif self.current_token.type == TokenType.LPAREN:
             return self.parse_call_expression(left)
@@ -530,14 +346,12 @@ class Parser:
             value = float(self.current_token.value)
             return NumberLiteral(value)
         except ValueError:
-            self.error(f"Could not parse number: {self.current_token.value}")
             return NumberLiteral(0)
     
     def parse_string_literal(self) -> StringLiteral:
         return StringLiteral(self.current_token.value)
     
     def parse_init_ger(self) -> Expression:
-        # CORRECTION : init.ger(expression)
         self.next_token()  # skip 'init.ger'
         
         if self.current_token.type != TokenType.LPAREN:
@@ -545,9 +359,6 @@ class Parser:
         
         self.next_token()  # skip '('
         arg = self.parse_expression(self.LOWEST)
-        
-        if not arg:
-            self.error("Expected expression inside init.ger")
         
         if not self.expect_peek(TokenType.RPAREN):
             self.error("Expected ')' after init.ger argument")
@@ -562,21 +373,6 @@ class Parser:
             self.error("Expected ')' after expression")
         
         return expr
-    
-    def parse_prefix_expression(self) -> Optional[Expression]:
-        op = self.current_token.type
-        self.next_token()  # skip operator
-        right = self.parse_expression(self.PREFIX)
-        
-        if not right:
-            return None
-        
-        if op == TokenType.MINUS:
-            # Créer une expression binaire: 0 - right
-            zero = NumberLiteral(0)
-            return BinaryExpression(TokenType.MINUS, zero, right)
-        
-        return right
     
     def parse_binary_expression(self, left: Expression) -> BinaryExpression:
         op = self.current_token.type
@@ -601,14 +397,14 @@ class Parser:
             self.next_token()
             return args
         
-        self.next_token()  # skip '(' or ','
+        self.next_token()
         arg = self.parse_expression(self.LOWEST)
         if arg:
             args.append(arg)
         
         while self.peek_token.type == TokenType.COMMA:
-            self.next_token()  # skip expression
-            self.next_token()  # skip ','
+            self.next_token()
+            self.next_token()
             arg = self.parse_expression(self.LOWEST)
             if arg:
                 args.append(arg)
@@ -618,18 +414,15 @@ class Parser:
         
         return args
 
-# ==================== INTERPRETER CORRIGÉ ====================
+# ==================== INTERPRETER ====================
 
 class Environment:
-    def __init__(self, parent=None):
+    def __init__(self):
         self.store: Dict[str, Any] = {}
-        self.parent = parent
     
     def get(self, name: str) -> Any:
         if name in self.store:
             return self.store[name]
-        elif self.parent:
-            return self.parent.get(name)
         else:
             raise NameError(f"Variable '{name}' not defined")
     
@@ -639,28 +432,19 @@ class Environment:
 class Interpreter:
     def __init__(self):
         self.environment = Environment()
-        self._init_builtins()
-    
-    def _init_builtins(self):
-        # Fonctions built-in
         self.environment.set("init_ger", lambda x: print(x))
-        self.environment.set("init_log", lambda x: print(f"[LOG] {x}"))
     
     def interpret(self, program: Program):
-        result = None
         for statement in program.statements:
-            result = self.evaluate_statement(statement)
-        return result
+            self.evaluate_statement(statement)
     
-    def evaluate_statement(self, stmt: Statement) -> Any:
+    def evaluate_statement(self, stmt: Statement):
         if isinstance(stmt, ExpressionStatement):
             return self.evaluate_expression(stmt.expression)
         elif isinstance(stmt, VariableDeclaration):
             value = self.evaluate_expression(stmt.value)
             self.environment.set(stmt.name, value)
             return value
-        else:
-            return None
     
     def evaluate_expression(self, expr: Expression) -> Any:
         if isinstance(expr, NumberLiteral):
@@ -674,7 +458,6 @@ class Interpreter:
             right = self.evaluate_expression(expr.right)
             
             if expr.operator == TokenType.PLUS:
-                # Concaténation intelligente
                 return str(left) + str(right) if isinstance(left, str) or isinstance(right, str) else left + right
             elif expr.operator == TokenType.MINUS:
                 return left - right
@@ -682,31 +465,19 @@ class Interpreter:
                 return left * right
             elif expr.operator == TokenType.SLASH:
                 return left / right if right != 0 else float('inf')
-            elif expr.operator == TokenType.EQ:
-                return left == right
-            elif expr.operator == TokenType.NEQ:
-                return left != right
-            elif expr.operator == TokenType.LT:
-                return left < right
-            elif expr.operator == TokenType.GT:
-                return left > right
-            else:
-                raise NotImplementedError(f"Operator {expr.operator} not implemented")
         elif isinstance(expr, CallExpression):
             if isinstance(expr.function, Identifier):
                 func = self.environment.get(expr.function.name)
                 if callable(func):
                     args = [self.evaluate_expression(arg) for arg in expr.arguments]
                     return func(*args)
-            return None
-        else:
-            raise NotImplementedError(f"Expression type {type(expr)} not implemented")
+        return None
 
-# ==================== CLI AMÉLIORÉ ====================
+# ==================== CLI ====================
 
 def show_help():
     print(f"""
-INITLANG {__version__} - {__description__}
+INITLANG {__version__}
 
 Usage:
   initlang [OPTIONS] [FILE]
@@ -715,122 +486,80 @@ Options:
   -h, --help          Show this help message
   -v, --version       Show version information
   -c, --command CODE  Execute code directly
-  --tokens            Show tokens during execution
-  --ast               Show AST during execution
 
 Examples:
   initlang                    # Start REPL
   initlang script.init        # Execute file
   initlang -c "let x ==> 5"  # Execute command
-  initlang --tokens --ast     # Debug mode
 
-Syntax Examples:
+Syntax:
   let x ==> 5
   init.ger("Hello World!")
-  fi add(a, b) {{ return a + b }}
-
-Note: Use quotes around strings in command line:
-  initlang -c "init.ger(\\"Hello\\")"
     """)
 
 def show_version():
     print(f"INITLANG version {__version__}")
-    print(f"Author: {__author__}")
 
-def execute_code(code: str, show_tokens: bool = False, show_ast: bool = False):
+def execute_code(code: str):
     try:
         lexer = Lexer(code)
-        
-        if show_tokens:
-            tokens = lexer.tokenize()
-            print("=== TOKENS ===")
-            for token in tokens:
-                print(f"  {token}")
-        
-        lexer2 = Lexer(code)
-        parser = Parser(lexer2)
+        parser = Parser(lexer)
         program = parser.parse_program()
-        
-        if show_ast:
-            print("=== AST ===")
-            print(program)
-        
         interpreter = Interpreter()
-        result = interpreter.interpret(program)
-        
-        if result is not None and not show_tokens and not show_ast:
-            print(result)
-            
+        interpreter.interpret(program)
     except Exception as e:
         print(f"Error: {e}")
 
 def main():
-    parser = argparse.ArgumentParser(description=__description__, add_help=False)
-    parser.add_argument('-h', '--help', action='store_true', help='Show help message')
-    parser.add_argument('-v', '--version', action='store_true', help='Show version')
-    parser.add_argument('-c', '--command', type=str, help='Execute code directly')
-    parser.add_argument('--tokens', action='store_true', help='Show tokens')
-    parser.add_argument('--ast', action='store_true', help='Show AST')
-    parser.add_argument('file', nargs='?', help='File to execute')
+    if len(sys.argv) == 1:
+        # REPL Mode
+        print(f"=== INITLANG {__version__} ===")
+        print("Type 'exit' to quit")
+        
+        while True:
+            try:
+                line = input("INITLANG> ").strip()
+                
+                if line.lower() in ['exit', 'quit']:
+                    break
+                elif line.lower() == 'help':
+                    show_help()
+                    continue
+                elif not line:
+                    continue
+                
+                execute_code(line)
+                
+            except EOFError:
+                break
+            except KeyboardInterrupt:
+                print("\nUse 'exit' to quit")
+            except Exception as e:
+                print(f"Error: {e}")
     
-    # Parse known args pour éviter les erreurs avec les guillemets
-    args, unknown = parser.parse_known_args()
-    
-    if args.help:
+    elif sys.argv[1] in ['-h', '--help']:
         show_help()
-        return
     
-    if args.version:
+    elif sys.argv[1] in ['-v', '--version']:
         show_version()
-        return
     
-    if args.command:
-        # CORRECTION : Gérer les guillemets dans la commande
-        command = args.command
-        execute_code(command, args.tokens, args.ast)
-        return
+    elif sys.argv[1] in ['-c', '--command'] and len(sys.argv) > 2:
+        execute_code(sys.argv[2])
     
-    if args.file:
-        if not os.path.exists(args.file):
-            print(f"Error: File '{args.file}' not found")
+    elif len(sys.argv) == 2:
+        # File execution
+        filename = sys.argv[1]
+        if not os.path.exists(filename):
+            print(f"Error: File '{filename}' not found")
             return
         
-        with open(args.file, 'r') as f:
+        with open(filename, 'r') as f:
             code = f.read()
         
-        execute_code(code, args.tokens, args.ast)
-        return
+        execute_code(code)
     
-    # Mode REPL
-    print(f"=== INITLANG {__version__} ===")
-    print("Type 'exit' or 'quit' to exit")
-    print("Type 'help' for help")
-    print()
-    
-    while True:
-        try:
-            line = input("INITLANG> ").strip()
-            
-            if line.lower() in ['exit', 'quit', 'q']:
-                break
-            elif line.lower() in ['help', '?']:
-                show_help()
-                continue
-            elif not line:
-                continue
-            
-            # CORRECTION : Ne pas ajouter de point-virgule automatiquement
-            execute_code(line, args.tokens, args.ast)
-            
-        except EOFError:
-            print("\nGoodbye!")
-            break
-        except KeyboardInterrupt:
-            print("\nUse 'exit' to quit")
-        except Exception as e:
-            print(f"Error: {e}")
-
-# ==================== EXECUTION ====================
+    else:
+        show_help()
 
 if __name__ == "__main__":
     main()
