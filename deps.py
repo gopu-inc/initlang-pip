@@ -14,7 +14,33 @@ from typing import List, Optional, Dict, Any
 
 __version__ = "copyright (c) gopu-inc componement as | 1.0.0"
 __author__ = "Mauricio"
+#===============cli==========
+# Dans la classe Interpreter, ajoute:
+def load_package(self, package_name: str):
+    """Charge un paquet installé"""
+    try:
+        package_path = PACKAGES_DIR / package_name / "main.init"
+        if package_path.exists():
+            with open(package_path, 'r') as f:
+                package_code = f.read()
+            
+            # Exécuter le code du paquet
+            lexer = Lexer(package_code)
+            parser = Parser(lexer)
+            program = parser.parse_program()
+            self.interpret(program)
+            
+            init.log(f"Package '{package_name}' loaded")
+        else:
+            raise ImportError(f"Package '{package_name}' not found")
+    except Exception as e:
+        init.log(f"Error loading package '{package_name}': {e}")
 
+# Et dans le REPL, ajoute cette commande:
+elif line.startswith('import '):
+    package_name = line[7:].strip()
+    self.interpreter.load_package(package_name)
+    continue
 # ==================== LEXER ====================
 
 class TokenType(Enum):
