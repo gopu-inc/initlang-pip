@@ -126,7 +126,7 @@ def show_help():
 INIT Package Manager
 
 Usage:
-  init [COMMAND] [ARGS]
+  initpkg [COMMAND] [ARGS]
 
 Commands:
   create <name>        Create a new package
