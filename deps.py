@@ -9,38 +9,18 @@ import os
 import argparse
 from enum import Enum
 from typing import List, Optional, Dict, Any
+from pathlib import Path
+
+# ==================== CONFIGURATION PAQUETS ====================
+
+INITLANG_HOME = Path.home() / ".initlang"
+PACKAGES_DIR = INITLANG_HOME / "packages"
 
 # ==================== VERSION ====================
 
 __version__ = "copyright (c) gopu-inc componement as | 1.0.0"
 __author__ = "Mauricio"
-#===============cli==========
-# Dans la classe Interpreter, ajoute:
-def load_package(self, package_name: str):
-    """Charge un paquet installé"""
-    try:
-        package_path = PACKAGES_DIR / package_name / "main.init"
-        if package_path.exists():
-            with open(package_path, 'r') as f:
-                package_code = f.read()
-            
-            # Exécuter le code du paquet
-            lexer = Lexer(package_code)
-            parser = Parser(lexer)
-            program = parser.parse_program()
-            self.interpret(program)
-            
-            init.log(f"Package '{package_name}' loaded")
-        else:
-            raise ImportError(f"Package '{package_name}' not found")
-    except Exception as e:
-        init.log(f"Error loading package '{package_name}': {e}")
 
-# Et dans le REPL, ajoute cette commande:
-elif line.startswith('import '):
-    package_name = line[7:].strip()
-    self.interpreter.load_package(package_name)
-    continue
 # ==================== LEXER ====================
 
 class TokenType(Enum):
@@ -532,6 +512,28 @@ class Interpreter:
         self.environment.set("init_ger", lambda x: print(x))
         self.environment.set("init_log", lambda x: print(f"[LOG] {x}"))
     
+    def load_package(self, package_name: str):
+        """Charge un paquet installé"""
+        try:
+            package_path = PACKAGES_DIR / package_name / "main.init"
+            if package_path.exists():
+                with open(package_path, 'r') as f:
+                    package_code = f.read()
+                
+                # Exécuter le code du paquet
+                lexer = Lexer(package_code)
+                parser = Parser(lexer)
+                program = parser.parse_program()
+                self.interpret(program)
+                
+                self.environment.set("init_log", lambda x: print(f"[LOG] {x}"))
+                self.environment.get("init_log")(f"Package '{package_name}' loaded")
+            else:
+                raise ImportError(f"Package '{package_name}' not found")
+        except Exception as e:
+            self.environment.set("init_log", lambda x: print(f"[LOG] {x}"))
+            self.environment.get("init_log")(f"Error loading package '{package_name}': {e}")
+    
     def interpret(self, program: Program):
         for statement in program.statements:
             self.evaluate_statement(statement)
@@ -579,7 +581,7 @@ class Interpreter:
                     return func(*args)
         return None
 
-# ==================== CLI AMÉLIORÉ ====================
+# ==================== CLI ====================
 
 def show_help():
     print(f"""
@@ -597,6 +599,7 @@ REPL Commands:
   help                Show this help
   vars                Show all variables
   clear               Clear screen
+  import <package>    Load a package
   exit, quit          Exit REPL
 
 Examples:
@@ -659,6 +662,10 @@ class REPL:
                     continue
                 elif line.lower() == 'clear':
                     clear_screen()
+                    continue
+                elif line.startswith('import '):
+                    package_name = line[7:].strip()
+                    self.interpreter.load_package(package_name)
                     continue
                 elif not line:
                     continue
